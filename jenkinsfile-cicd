@@ -1,56 +1,50 @@
-pipeline{
+pipeline {
     agent any
-    tools{
-        maven 'maven-3.9'
+    tools {
+        maven 'maven'
+        jdk 'jdk-17'
     }
-    stages{
-        stage('checkout the code'){
-            steps{
-                git url:'https://github.com/bcreddydevops/chinna-app.git', branch: 'main'
+    stages {
+        stage('Git checkout') {
+            steps {
+                git url: 'https://github.com/Karthik351/CI-CD-SampleApp.git', branch: 'main'
             }
         }
-        stage('build the code'){
-            steps{
+        stage('Maven Build Application') {
+            steps {
                 sh 'mvn clean package'
             }
         }
-        stage('Generate sonarqube-analysis'){
-            steps{
-                withSonarQubeEnv(installationName: 'sonarqube-8', credentialsId: 'jenkins-sonar-token') {
-                 sh 'mvn sonar:sonar'
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv(installationName: 'SonarQube', credentialsId: 'jenkins-sonar-token') {
+                    sh 'mvn sonar:sonar'
                 }
             }
         }
-        stage('Upload War file to Nexus'){
-            steps{
-             nexusArtifactUploader artifacts: [
-                 [
-                     artifactId: 'devops', 
-                     classifier: '', 
-                     file: 'target/hiring.war', 
-                     type: 'war'
-                ]
-            ], 
-            credentialsId: 'nexus-credentials', 
-            groupId: 'in.javahome', 
-            nexusUrl: '52.90.34.45:8081', 
-            nexusVersion: 'nexus3', 
-            protocol: 'http', 
-            repository: 'spring-initial', 
-            version: '0.0.1'
+        stage('Upload WAR file to Nexus Repository') {
+            steps {
+                nexusArtifactUploader artifacts: [
+                    [
+                        artifactId: 'hiring', 
+                        classifier: '', 
+                        file: 'target/hiring.war', 
+                        type: 'war'
+                    ]
+                ],
+                credentialsId: 'nexus-jenkin', 
+                groupId: 'in.javahome', 
+                nexusUrl: 'localhost:8081', 
+                nexusVersion: 'nexus3', 
+                protocol: 'http', 
+                repository: 'cicdSampleApp', 
+                version: '0.1'
             }
         }
-		stage('Deploy War file to Tommcat'){
-            steps{
-               sshagent(['tomcat-credentials']) {
-                  sh """
-                    scp -o StrictHostKeyChecking=no target/*.war ubuntu@54.173.252.57:/opt/apache-tomcat-9.0.72/webapps
-                    ssh -o StrictHostKeyChecking=no ubuntu@54.173.252.57 /opt/apache-tomcat-9.0.72/bin/shutdown.sh
-                    ssh -o StrictHostKeyChecking=no ubuntu@54.173.252.57 /opt/apache-tomcat-9.0.72/bin/startup.sh
-					
-		          """          
-               }
+        stage('Tomcat Deployment') {
+            steps {
+             deploy adapters: [tomcat9(credentialsId: 'tomcat-jenkins', path: '', url: 'http://localhost:8082/manager/text')], contextPath: null, war: '**/*.war'
             }
         }
-    }   
- }
+    }
+}
